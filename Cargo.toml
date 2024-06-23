@@ -1,0 +1,28 @@
+[package]
+name = "horizon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+gtk = { version = "0.8.2", package = "gtk4", features = ["v4_14"] }
+gdk = "0.18.0"
+gdk-x11 = { version = "0.8.2", package = "gdk4-x11" }
+gdk-pixbuf = "0.19.8"
+glib = "0.19.8"
+gio = "0.19.8"
+pango = "0.19.8"
+cairo-rs = "0.19.4"
+
+x11rb = "0.13.1"
+
+anyhow = "1.0.86"
+thiserror = "1.0.61"
+tracing = "0.1.40"
+
+clap = "4.5.7"
+serde = "1.0.203"
+tokio = "1.38.0"
+zbus = "4.3.0"
+
+chrono = "0.4.38"
+
