@@ -1,6 +1,25 @@
-use std::fmt;
+use std::{fmt, u32};
 
 use crate::util::Side;
+
+x11rb::atom_manager! {
+    pub AtomCollection: AtomCollectionCookie {
+        _NET_WM_WINDOW_TYPE,
+        _NET_WM_WINDOW_TYPE_DESKTOP,
+        _NET_WM_WINDOW_TYPE_DIALOG,
+        _NET_WM_WINDOW_TYPE_DOCK,
+        _NET_WM_WINDOW_TYPE_NOTIFICATION,
+        _NET_WM_WINDOW_TYPE_NORMAL,
+        _NET_WM_WINDOW_TYPE_TOOLBAR,
+        _NET_WM_WINDOW_TYPE_UTILITY,
+        _NET_WM_STATE,
+        _NET_WM_STATE_ABOVE,
+        _NET_WM_STATE_BELOW,
+        _NET_WM_STATE_STICKY,
+        _NET_WM_STRUT_PARTIAL,
+        ATOM,
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct StrutPartialDef {
@@ -140,6 +159,18 @@ impl StrutPartialDefBuilder {
             bottom_start_x: self.bottom_start_x,
             bottom_end_x: self.bottom_end_x,
         }
+    }
+
+    pub fn top(mut self, width: u32, start_x: u32, end_x: i64) -> Self {
+        let end_x = match end_x {
+            x if x >= 0 => end_x,
+            x if x < 0 => 5120 + end_x,
+            _ => unreachable!(),
+        };
+        self.top = width;
+        self.top_start_x = start_x;
+        self.top_end_x = end_x as u32;
+        self
     }
 
     pub fn full_length(mut self, side: Side, size: u32) -> Self {

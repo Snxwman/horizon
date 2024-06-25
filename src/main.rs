@@ -1,50 +1,51 @@
 #![allow(unused_variables)]
+#![allow(dead_code)]
 
 mod state;
 mod widgets;
+mod x;
 
-mod config;
-mod ewmh;
 mod horizon;
 mod util;
-mod x;
 
 use std::rc::Rc;
 
-use gtk::prelude::*;
-use gtk::glib;
-use gtk::{Application, ApplicationWindow};
+use gdk_x11::gdk::Display;
 use glib::clone;
-use horizon::HorizonXSurfaceContext;
+use gtk::prelude::*;
+use gtk::{Application, CssProvider, glib};
 
-use ewmh::StrutPartialDef;
-use util::Side;
+use x::x::{XSessionContext, XWindowContext};
 
 const APP_ID: &str = "dev.snxwman.horizon";
 
-fn build_ui(app: &Application) {
+fn load_css() {
+    let provider = CssProvider::new();
+    provider.load_from_string(include_str!("../styles/main.css"));
 
-    let app_window = ApplicationWindow::builder()
-        .application(app)
-        .default_width(5120)
-        .default_height(20)
-        .resizable(false)
-        .build();
+    gtk::style_context_add_provider_for_display(
+        &Display::default().expect("Could not connect to a display."), 
+        &provider, 
+        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION
+    );
+}
 
-    app_window.present();
+fn app_main(app: &Application) {
+    let x_session_context = Rc::new(XSessionContext::new());
+    let horizon_windows = horizon::get_windows(app, x_session_context.clone());
 
-    let strut = StrutPartialDef::builder()
-        .full_length(Side::Top, 20)
-        .build();
+    for window in horizon_windows {
+        window.window.present();
 
-    let x_context = Rc::new(HorizonXSurfaceContext::new(&app_window, Some(strut)));
+        let x_window_context = XWindowContext::new(x_session_context.clone(), &window); 
+        x_window_context.set_strut_partial_hint(x_session_context.clone());
+        x_window_context.set_window_type_hint(x_session_context.clone());
 
-    x_context.set_strut_partial();
-    x_context.set_window_type();
-
-    app_window.connect_unrealize(clone!(@strong x_context => move |_| {
-        x_context.reset_strut_partial();
-    })); 
+        window.window.connect_unrealize(clone!(@strong x_session_context => move |_| {
+            println!("unrealizing window");
+            x_window_context.reset_strut_partial_hint(x_session_context.clone());
+        })); 
+    }
 }
 
 fn main() -> glib::ExitCode {
@@ -52,7 +53,8 @@ fn main() -> glib::ExitCode {
         .application_id(APP_ID)
         .build();
 
-    app.connect_activate(build_ui);
+    app.connect_startup(|_| load_css());
+    app.connect_activate(app_main);
 
     app.run()
 }

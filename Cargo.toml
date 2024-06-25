@@ -13,7 +13,7 @@ gio = "0.19.8"
 pango = "0.19.8"
 cairo-rs = "0.19.4"
 
-x11rb = "0.13.1"
+x11rb = { version = "0.13.1", features = ["extra-traits"] }
 
 anyhow = "1.0.86"
 thiserror = "1.0.61"
@@ -25,4 +25,5 @@ tokio = "1.38.0"
 zbus = "4.3.0"
 
 chrono = "0.4.38"
+nix = "0.29.0"
 
