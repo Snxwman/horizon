@@ -1,8 +1,10 @@
 use std::rc::Rc;
+use std::sync::Arc;
 
 use gtk::{Application, Window};
 
-use crate::util::Side; 
+use crate::util::Side;
+use crate::widgets;
 use crate::x::ewmh::StrutPartialDef;
 use crate::x::x::XSessionContext;
 
@@ -55,7 +57,7 @@ pub struct Position {
 pub struct HorizonWindowConfig {
     pub screen: usize,
     pub size: Size,
-    pub position: Position, 
+    pub position: Position,
     pub anchor: WindowAnchor,
     pub wm_ignore: bool,
     pub stack_position: WindowStackPosition,
@@ -69,10 +71,15 @@ pub struct HorizonWindow {
     pub window: gtk::Window,
 }
 
-pub fn get_windows(horizon: &Application, x_session: Rc<XSessionContext>) -> Vec<HorizonWindow>{
+pub fn get_windows(horizon: &Application, x_session: Rc<XSessionContext>)
+    -> Vec<HorizonWindow> {
+    // let strut = StrutPartialDef::builder()
+    //     .full_length(Side::Top, HEIGHT as u32)
+    //     .build();
+
     let strut = StrutPartialDef::builder()
-            .full_length(Side::Top, HEIGHT as u32)
-            .build();
+        .full_length(Side::Top, 0)
+        .build();
 
     let config = HorizonWindowConfig {
         screen: MONITOR,
@@ -85,12 +92,15 @@ pub fn get_windows(horizon: &Application, x_session: Rc<XSessionContext>) -> Vec
         strut: Some(strut),
     };
 
+    let clock = widgets::clock::Clock::new();
+
     let window = Window::builder()
         .application(horizon)
         .default_width(config.size.width)
         .default_height(config.size.height)
         .resizable(false)
-        // .child(child)
+        .focusable(true)
+        .child(&clock.widget())
         .build();
 
     vec![
