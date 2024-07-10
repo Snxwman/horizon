@@ -113,7 +113,6 @@ impl HorizonDateTime {
     }
 
     pub fn update_time_from_chrono(&mut self) {
-        println!("in update time");
         self.time = HorizonTime::new_from_chrono();
     }
 }

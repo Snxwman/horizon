@@ -19,8 +19,11 @@ use gtk::{Application, CssProvider, glib};
 use tokio::task;
 use tokio::time;
 
-use state::time::DATETIME;
+use event::Event;
 use x::x::{XSessionContext, XWindowContext};
+
+use event::EVENT_MANAGER;
+use state::time::DATETIME;
 
 const APP_ID: &str = "dev.snxwman.horizon";
 
@@ -36,16 +39,14 @@ fn load_css() {
 }
 
 async fn tokio_main() {
-    println!("tokio_main");
     let forever = task::spawn(async move {
-        println!("forever");
         let mut interval = time::interval(Duration::from_secs(1));
 
         loop {
             interval.tick().await;
-            println!("about to write");
             DATETIME.write().unwrap().update();
-            print!("{:#?}", DATETIME.read().unwrap());
+            // EVENT_MANAGER.notify_listeners(Event::HorizonDateTimeUpdated);
+            // print!("{:#?}", DATETIME.read().unwrap());
         }
     }).await;
 }
@@ -74,7 +75,6 @@ fn gtk_main(app: &Application) {
         x_window_context.set_strut_partial_hint(x_session_context.clone());
 
         window.window.connect_unrealize(clone!(@strong x_session_context => move |_| {
-            println!("unrealizing window");
             x_window_context.reset_strut_partial_hint(x_session_context.clone());
         }));
     }

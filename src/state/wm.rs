@@ -3,14 +3,14 @@ use std::sync::RwLock;
 
 use once_cell::sync::Lazy;
 
-pub static DATETIME: Lazy<RwLock<Wm>> = Lazy::new(|| {
-    RwLock::new(Wm::new())
+pub static WM: Lazy<RwLock<HorizonWm>> = Lazy::new(|| {
+    RwLock::new(HorizonWm::new())
 });
 
 #[derive(Debug)]
-pub struct Wm {}
+pub struct HorizonWm {}
 
-impl Wm {
+impl HorizonWm {
     fn new() -> Self {
         todo!()
     }
