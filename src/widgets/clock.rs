@@ -3,25 +3,23 @@ use std::sync::RwLock;
 use glib::clone;
 use gtk::Label;
 
-use crate::state::time::LocalDateTime;
 use crate::state::time::DATETIME;
+use crate::state::time::HorizonDateTime;
 
 
 pub struct Clock {
     gtk_widget: Label,
-    data: &'static RwLock<LocalDateTime>,
+    data: &'static RwLock<HorizonDateTime>,
 }
 
 impl Clock {
-    pub fn new() -> Clock {
-        let time = "test";
+    pub fn new() -> Self {
         let label = Label::builder()
-            .label(time)
+            .label(Clock::formatted_time())
             .build();
 
         let tick = clone!(@strong label => move || {
-            let time = DATETIME.read().unwrap().0;
-            label.set_label(&time.to_string());
+            label.set_label(&Clock::formatted_time());
             glib::ControlFlow::Continue
         });
 
@@ -35,6 +33,19 @@ impl Clock {
 
     pub fn widget(self) -> Label {
         self.gtk_widget
+    }
+
+    fn formatted_time() -> String {
+        let datetime = DATETIME.read().unwrap();
+        format!(
+            "{}, {} {} | {}:{:02}:{:02}",
+            datetime.date.day.short_name,
+            datetime.date.month.short_name,
+            datetime.date.day.day_of_month,
+            datetime.time.hour,
+            datetime.time.minute,
+            datetime.time.second,
+        )
     }
 }
 

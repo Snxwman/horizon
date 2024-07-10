@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 gtk = { version = "0.8.2", package = "gtk4", features = ["v4_14"] }
-gdk = "0.18.0"
+gdk = {version = "0.8.2", package = "gdk4", features = ["v4_14"] }
 gdk-x11 = { version = "0.8.2", package = "gdk4-x11" }
 gdk-pixbuf = "0.19.8"
 glib = "0.19.8"

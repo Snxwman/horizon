@@ -5,21 +5,21 @@ mod state;
 mod widgets;
 mod x;
 
+mod event;
 mod horizon;
 mod util;
 
 use std::rc::Rc;
-use std::sync::Arc;
 use std::time::Duration;
 
 use gdk_x11::gdk::Display;
 use glib::clone;
 use gtk::prelude::*;
 use gtk::{Application, CssProvider, glib};
-use tokio::{spawn, task};
+use tokio::task;
 use tokio::time;
 
-use state::time::{LocalDateTime, DATETIME};
+use state::time::DATETIME;
 use x::x::{XSessionContext, XWindowContext};
 
 const APP_ID: &str = "dev.snxwman.horizon";
@@ -43,8 +43,9 @@ async fn tokio_main() {
 
         loop {
             interval.tick().await;
+            println!("about to write");
             DATETIME.write().unwrap().update();
-            println!("{}", DATETIME.read().unwrap().0);
+            print!("{:#?}", DATETIME.read().unwrap());
         }
     }).await;
 }
@@ -89,3 +90,4 @@ fn main() {
 
     app.run();
 }
+

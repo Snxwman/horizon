@@ -1,12 +1,14 @@
 use std::rc::Rc;
-use std::sync::Arc;
 
 use gtk::{Application, Window};
 
 use crate::util::Side;
-use crate::widgets;
 use crate::x::ewmh::StrutPartialDef;
 use crate::x::x::XSessionContext;
+
+use crate::widgets::{
+    clock::Clock,
+};
 
 const MONITOR: usize = 0;
 const HEIGHT: i32 = 30;
@@ -92,7 +94,7 @@ pub fn get_windows(horizon: &Application, x_session: Rc<XSessionContext>)
         strut: Some(strut),
     };
 
-    let clock = widgets::clock::Clock::new();
+    let clock = Clock::new();
 
     let window = Window::builder()
         .application(horizon)
