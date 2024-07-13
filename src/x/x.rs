@@ -1,3 +1,4 @@
+use std::cmp::max;
 use std::rc::Rc;
 
 use gdk_x11::prelude::*;
@@ -5,92 +6,147 @@ use gdk_x11::{X11Monitor, X11Surface};
 use gdk_x11::gdk::Display;
 use gtk::prelude::*;
 use x11rb::connection::Connection;
-use x11rb::protocol::xproto::{Atom, AtomEnum, ConnectionExt, PropMode};
+use x11rb::protocol::xproto::{Atom, AtomEnum, ConfigureWindowAux, ConnectionExt, PropMode};
 use x11rb::rust_connection::RustConnection;
 
-use crate::horizon::{HorizonWindow, WindowType};
+use crate::horizon::{HorizonWindow, HorizonWindowConfig, WindowType};
 use crate::x::ewmh::{AtomCollection, StrutPartialDef};
 
 #[derive(Debug)]
 pub struct XSessionContext {
     pub connection: Rc<RustConnection>,
-    pub default_display: Display,
+    pub display: Display,
+    pub display_bounds: (u32, u32),
     pub monitors: Vec<X11Monitor>,
 }
 
 impl XSessionContext {
     pub fn new() -> Self {
         let (connection, screen_idx) = RustConnection::connect(None).unwrap();
-        let default_display = Display::default().unwrap();
-        let monitors = default_display.monitors()
+        let display = Display::default().unwrap();
+        let monitors: Vec<_> = display.monitors()
             .into_iter()
             .map(|x| x.unwrap().downcast::<X11Monitor>().unwrap())
             .collect();
 
-        XSessionContext {
+        let mut display_width = 0;
+        let mut display_height = 0;
+
+        for monitor in &monitors {
+            let end_x = (monitor.workarea().x() + monitor.workarea().width()) as u32;
+            let end_y = (monitor.workarea().y() + monitor.workarea().height()) as u32;
+            display_width = max(display_width, end_x);
+            display_height = max(display_height, end_y);
+        }
+
+        Self {
             connection: connection.into(),
-            default_display,
+            display,
+            display_bounds: (display_width, display_height),
             monitors,
         }
     }
 
-    pub fn get_monitor_width(&self, monitor_index: usize) -> i32 {
-        if monitor_index > self.monitors.len() {
-            panic!("Monitor {} does not exist", monitor_index);
-        }
+    pub fn get_monitor_offsets(&self, monitor_index: usize) -> (u32, u32) {
+        let workarea = self.monitors[monitor_index].workarea();
+        (workarea.x() as u32, workarea.y() as u32)
+    }
 
+    pub fn get_monitor_bounds(&self, monitor_index: usize) -> (u32, u32, u32, u32) {
+        let workarea = self.monitors[monitor_index].workarea();
+
+        // (start_x, end_x, start_y, end_y)
+        (
+            workarea.x() as u32, (workarea.x() + workarea.width()) as u32,
+            workarea.y() as u32, (workarea.y() + workarea.height()) as u32
+        )
+    }
+
+    pub fn get_monitor_width(&self, monitor_index: usize) -> i32 {
         self.monitors[monitor_index].workarea().width()
     }
 
     pub fn get_monitor_height(&self, monitor_index: usize) -> i32 {
-        if monitor_index > self.monitors.len() {
-            panic!("Monitor {} does not exist", monitor_index);
-        }
-
         self.monitors[monitor_index].workarea().height()
     }
 }
 
 pub struct XWindowContext {
+    surface: X11Surface,
     xid: Atom,
     atoms: AtomCollection,
-    strut: Option<StrutPartialDef>,  // The true strut request accounting for multimonitors
     window_type: u32,
+    strut: Option<StrutPartialDef>,
 }
 
 impl XWindowContext {
     pub fn new(x_session: Rc<XSessionContext>, horizon_window: &HorizonWindow) -> Self {
+        let surface = horizon_window.gtk_window
+            .surface()
+            .and_downcast::<X11Surface>()
+            .expect("Failed to downcast to X11Surface");
+
+        let xid = surface.xid() as Atom;
+
+        let strut = horizon_window.config.strut.clone();
+            // .as_ref()
+            // .map(|strut| strut.with_offset());
+
         let atoms = AtomCollection::new(&x_session.connection).unwrap()
             .reply().unwrap();
-
-        let xid = horizon_window.window
-            .surface()
-            .and_downcast_ref::<X11Surface>().expect("Failed to downcast to X11Surface")
-            .xid() as Atom;
-
-        let strut = horizon_window.config.strut
-            .as_ref()
-            .map(|strut| strut.with_offset());
 
         let window_type = match horizon_window.config.window_type {
             WindowType::Desktop => atoms._NET_WM_WINDOW_TYPE_DESKTOP,
             WindowType::Dock => atoms._NET_WM_WINDOW_TYPE_DOCK,
             WindowType::Dialog => atoms._NET_WM_WINDOW_TYPE_DIALOG,
+            WindowType::Menu => atoms._NET_WM_WINDOW_TYPE_MENU,
             WindowType::Normal => atoms._NET_WM_WINDOW_TYPE_NORMAL,
             WindowType::Notification => atoms._NET_WM_WINDOW_TYPE_NOTIFICATION,
+            WindowType::Splash => atoms._NET_WM_WINDOW_TYPE_SPLASH,
             WindowType::Toolbar => atoms._NET_WM_WINDOW_TYPE_TOOLBAR,
             WindowType::Utility => atoms._NET_WM_WINDOW_TYPE_UTILITY,
         };
 
-        XWindowContext {
+        Self {
+            surface,
             xid,
             atoms,
             strut,
             window_type
-        }   
+        }
     }
 
-    pub fn set_strut_partial_hint(&self, x_session: Rc<XSessionContext>) {
+
+    pub fn configure_xwindow(&self, x_session: Rc<XSessionContext>, horizon_window: &HorizonWindow) {
+        self.set_ewmh_hints(x_session.clone(), horizon_window);
+        self.move_window(x_session.clone(), &horizon_window.config);
+    }
+
+    pub fn move_window(&self, x_session: Rc<XSessionContext>, horizon_window: &HorizonWindowConfig) {
+        let (monitor_start_x, monitor_start_y) = x_session.get_monitor_offsets(horizon_window.screen);
+
+        let window_config = ConfigureWindowAux::new()
+            .x(monitor_start_x as i32 + horizon_window.position.x)
+            .y(monitor_start_y as i32 + horizon_window.position.y);
+            // .width(horizon_window.size.width as u32)
+            // .height(horizon_window.size.height as u32);
+
+        let _ = x_session.connection.configure_window(self.xid, &window_config).unwrap();
+        x_session.connection.flush().expect("Failed to configure X window.");
+        dbg!("{:?}", window_config);
+    }
+
+    pub fn set_ewmh_hints(&self, x_session: Rc<XSessionContext>, horizon_window: &HorizonWindow) {
+        self.set_window_type_hint(x_session.clone());
+        self.set_strut_partial_hint(x_session.clone());
+
+        // NOTE: Eventually will create our own methods like set_strut_partial_hint() rather than use gtk's builtins.
+        // Both for consistency and to support setting/resetting the other _NET_WM_STATE_* hints.
+        self.surface.set_skip_taskbar_hint(horizon_window.config.wm_ignore);
+        self.surface.set_skip_pager_hint(horizon_window.config.wm_ignore);
+    }
+
+    fn set_strut_partial_hint(&self, x_session: Rc<XSessionContext>) {
         if self.strut.is_none() {
             return;
         }
@@ -119,9 +175,10 @@ impl XWindowContext {
         println!("Set _NET_WM_STRUT_PARTIAL");
     }
 
-    pub fn reset_strut_partial_hint(&self, x_session: Rc<XSessionContext>) {
-        let zero_strut = StrutPartialDef::get_strut_partial_zero();
+    fn reset_strut_partial_hint(&self, x_session: Rc<XSessionContext>) {
+        let zero_strut = StrutPartialDef::default();
 
+        // NOTE: use delete_property()
         x_session.connection.change_property(
             PropMode::REPLACE,
             self.xid,
@@ -133,10 +190,10 @@ impl XWindowContext {
         ).expect("Failed to reset _NET_WM_STRUT_PARTIAL property").check().unwrap();
 
         x_session.connection.flush().expect("Failed to flush connection");
-        println!("Reset _NET_WM_STRUT_PARTIAL");
+        // println!("Reset _NET_WM_STRUT_PARTIAL");
     }
 
-    pub fn set_window_type_hint(&self, x_session: Rc<XSessionContext>) {
+    fn set_window_type_hint(&self, x_session: Rc<XSessionContext>) {
         x_session.connection.change_property(
             PropMode::REPLACE,
             self.xid,
@@ -148,6 +205,6 @@ impl XWindowContext {
         ).expect("Failed to set _NET_WM_WINDOW_TYPE property").check().unwrap();
 
         x_session.connection.flush().expect("Failed to flush connection");
-        println!("Set _NET_WM_WINDOW_TYPE");
+        // println!("Set _NET_WM_WINDOW_TYPE");
     }
 }

@@ -1,5 +1,12 @@
-pub mod clock;
+#![allow(unused_imports)]
 
-pub trait UsesHorizonData {
-    fn update(&self);
-}
+mod clock;
+mod icon;
+mod workspaces;
+
+pub use crate::widgets::{
+    clock::Clock,
+    icon::Icon,
+    workspaces::Workspaces,
+};
+

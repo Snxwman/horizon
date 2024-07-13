@@ -3,9 +3,7 @@ use std::sync::RwLock;
 use glib::clone;
 use gtk::Label;
 
-use crate::state::time::DATETIME;
-use crate::state::time::HorizonDateTime;
-
+use crate::state::*;
 
 pub struct Clock {
     gtk_widget: Label,
