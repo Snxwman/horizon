@@ -15,9 +15,8 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use gdk_x11::gdk::Display;
-use glib::bitflags::Flags;
 use glib::clone;
-use gtk::{prelude::*, set_debug_flags, DebugFlags};
+use gtk::prelude::*;
 use gtk::{Application, CssProvider};
 use tokio::{task, time};
 
@@ -48,6 +47,7 @@ async fn tokio_main() {
         loop {
             interval.tick().await;
             DATETIME.write().unwrap().update();
+            let _ = DATETIME.write().unwrap().sender.send(ChannelMessage::Updated);
             // EVENT_MANAGER.notify_listeners(Event::HorizonDateTimeUpdated);
             // print!("{:#?}", DATETIME.read().unwrap());
         }

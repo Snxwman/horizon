@@ -1,9 +1,12 @@
 use std::fs::File;
 use std::sync::RwLock;
 
-use once_cell::sync::Lazy;
-
 use chrono::prelude::*;
+use once_cell::sync::Lazy;
+use tokio::sync::watch;
+use tokio::sync::watch::Sender;
+
+use super::ChannelMessage;
 
 pub static DATETIME: Lazy<RwLock<HorizonDateTime>> = Lazy::new(|| {
     RwLock::new(HorizonDateTime::new_from_chrono())
@@ -16,20 +19,21 @@ pub static DATETIME: Lazy<RwLock<HorizonDateTime>> = Lazy::new(|| {
 pub struct HorizonDateTime {
     pub date: HorizonDate,
     pub time: HorizonTime,
+    pub sender: Sender<ChannelMessage>,
 }
 
 #[derive(Debug)]
 pub struct HorizonDate {
-    pub year: u16,
+    pub year: u32,
     pub month: Month,
     pub day: Day,
 }
 
 #[derive(Debug)]
 pub struct HorizonTime {
-    pub hour: u8,
-    pub minute: u8,
-    pub second: u8,
+    pub hour: u32,
+    pub minute: u32,
+    pub second: u32,
     // pub timezone: String,
 }
 
@@ -37,7 +41,7 @@ pub struct HorizonTime {
 pub struct Month {
     pub name: String,
     pub short_name: String,
-    pub number: u8,
+    pub number: u32,
     pub month: Months,
 }
 
@@ -47,9 +51,9 @@ pub struct Day {
     pub short_name: String,
     pub weekday: Weekday,
     pub day_type: DayType,
-    pub day_of_year: u16,
-    pub day_of_month: u16,
-    pub week_number: u16,
+    pub day_of_year: u32,
+    pub day_of_month: u32,
+    pub week_number: u32,
 }
 
 #[derive(Debug)]
@@ -98,9 +102,12 @@ pub enum IntoDaysError {
 
 impl HorizonDateTime {
     pub fn new_from_chrono() -> Self {
+        let (sender, reveiver) = watch::channel(ChannelMessage::Init);
+
         Self {
             date: HorizonDate::new_from_chrono(),
             time: HorizonTime::new_from_chrono(),
+            sender,
         }
     }
 
@@ -121,16 +128,16 @@ impl HorizonDate {
     pub fn new_from_chrono() -> Self {
         let now = Local::now();
 
-        let year = now.year() as u16;
+        let year = now.year() as u32;
         let month = Month::new(
-            Months::try_from(now.month() as u8).unwrap().to_string().as_str(),
-            now.month() as u8,
+            Months::try_from(now.month()).unwrap().to_string().as_str(),
+            now.month(),
         );
         let day = Day::new(
             now.weekday().to_string().as_str(),
-            now.ordinal() as u16,
-            now.day() as u16,
-            now.iso_week().week() as u16,
+            now.ordinal(),
+            now.day(),
+            now.iso_week().week(),
         );
 
         Self {
@@ -147,9 +154,9 @@ impl HorizonTime {
         let tz = now.timezone();
 
         Self {
-            hour: now.hour() as u8,
-            minute: now.minute() as u8,
-            second: now.second() as u8,
+            hour: now.hour(),
+            minute: now.minute(),
+            second: now.second(),
         }
     }
 }
@@ -173,7 +180,7 @@ impl From<File> for HorizonTime {
 }
 
 impl Month {
-    fn new(name: &str, number: u8) -> Self {
+    fn new(name: &str, number: u32) -> Self {
         let name = name.to_owned();
         let short_name = match name.as_str() {
             "September" => "Sept".to_owned(),
@@ -232,10 +239,10 @@ impl TryFrom<&str> for Months {
     }
 }
 
-impl TryFrom<u8> for Months {
+impl TryFrom<u32> for Months {
     type Error = IntoMonthsError;
 
-    fn try_from(number: u8) -> Result<Self, Self::Error> {
+    fn try_from(number: u32) -> Result<Self, Self::Error> {
         match number {
             1  => Ok(Months::January),
             2  => Ok(Months::February),
@@ -255,7 +262,7 @@ impl TryFrom<u8> for Months {
 }
 
 impl Day {
-    fn new(name: &str, day_of_year: u16, day_of_month: u16, week_number: u16) -> Self {
+    fn new(name: &str, day_of_year: u32, day_of_month: u32, week_number: u32) -> Self {
         let name = name.to_owned();
         let short_name = name[0..3].to_owned();
         let weekday = Weekday::try_from(name.as_str())

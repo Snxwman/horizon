@@ -9,14 +9,15 @@ use x11rb::connection::Connection;
 use x11rb::protocol::xproto::{Atom, AtomEnum, ConfigureWindowAux, ConnectionExt, PropMode};
 use x11rb::rust_connection::RustConnection;
 
-use crate::horizon::{HorizonWindow, HorizonWindowConfig, WindowType};
-use crate::x::ewmh::{AtomCollection, StrutPartialDef};
+use crate::horizon::{HorizonWindow, HorizonWindowConfig};
+use crate::x::ewmh::{AtomCollection, WindowType};
+use crate::x::strut::StrutPartialDef;
 
 #[derive(Debug)]
 pub struct XSessionContext {
     pub connection: Rc<RustConnection>,
     pub display: Display,
-    pub display_bounds: (u32, u32),
+    pub display_bounds: (i32, i32),
     pub monitors: Vec<X11Monitor>,
 }
 
@@ -33,8 +34,8 @@ impl XSessionContext {
         let mut display_height = 0;
 
         for monitor in &monitors {
-            let end_x = (monitor.workarea().x() + monitor.workarea().width()) as u32;
-            let end_y = (monitor.workarea().y() + monitor.workarea().height()) as u32;
+            let end_x = monitor.workarea().x() + monitor.workarea().width();
+            let end_y = monitor.workarea().y() + monitor.workarea().height();
             display_width = max(display_width, end_x);
             display_height = max(display_height, end_y);
         }
@@ -47,18 +48,18 @@ impl XSessionContext {
         }
     }
 
-    pub fn get_monitor_offsets(&self, monitor_index: usize) -> (u32, u32) {
+    pub fn get_monitor_offsets(&self, monitor_index: usize) -> (i32, i32) {
         let workarea = self.monitors[monitor_index].workarea();
-        (workarea.x() as u32, workarea.y() as u32)
+        (workarea.x(), workarea.y())
     }
 
-    pub fn get_monitor_bounds(&self, monitor_index: usize) -> (u32, u32, u32, u32) {
+    pub fn get_monitor_bounds(&self, monitor_index: usize) -> (i32, i32, i32, i32) {
         let workarea = self.monitors[monitor_index].workarea();
 
         // (start_x, end_x, start_y, end_y)
         (
-            workarea.x() as u32, (workarea.x() + workarea.width()) as u32,
-            workarea.y() as u32, (workarea.y() + workarea.height()) as u32
+            workarea.x(), workarea.x() + workarea.width(),
+            workarea.y(), workarea.y() + workarea.height()
         )
     }
 
@@ -129,7 +130,7 @@ impl XWindowContext {
             .x(monitor_start_x as i32 + horizon_window.position.x)
             .y(monitor_start_y as i32 + horizon_window.position.y);
             // .width(horizon_window.size.width as u32)
-            // .height(horizon_window.size.height as u32);
+            // .height(horizon_window.size.height);
 
         let _ = x_session.connection.configure_window(self.xid, &window_config).unwrap();
         x_session.connection.flush().expect("Failed to configure X window.");
@@ -176,7 +177,7 @@ impl XWindowContext {
     }
 
     fn reset_strut_partial_hint(&self, x_session: Rc<XSessionContext>) {
-        let zero_strut = StrutPartialDef::default();
+        let zero_strut = StrutPartialDef::default().as_x11_ready_value();
 
         // NOTE: use delete_property()
         x_session.connection.change_property(
@@ -186,7 +187,7 @@ impl XWindowContext {
             AtomEnum::CARDINAL,
             32,
             12,
-            &zero_strut.as_x11_ready_value()
+            &zero_strut
         ).expect("Failed to reset _NET_WM_STRUT_PARTIAL property").check().unwrap();
 
         x_session.connection.flush().expect("Failed to flush connection");

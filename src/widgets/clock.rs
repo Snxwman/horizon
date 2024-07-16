@@ -1,31 +1,40 @@
 use std::sync::RwLock;
 
-use glib::clone;
-use gtk::Label;
+use glib::{clone, ControlFlow};
+use gtk::prelude::*;
+use gtk::{Button, Label};
+use tokio::sync::watch::Receiver;
 
 use crate::state::*;
 
 pub struct Clock {
     gtk_widget: Label,
-    data: &'static RwLock<HorizonDateTime>,
+    receiver: Receiver<ChannelMessage>,
 }
 
 impl Clock {
     pub fn new() -> Self {
+        let receiver = DATETIME.read().unwrap().sender.subscribe();
+
         let label = Label::builder()
             .label(Clock::formatted_time())
             .build();
 
-        let tick = clone!(@strong label => move || {
-            label.set_label(&Clock::formatted_time());
-            glib::ControlFlow::Continue
-        });
-
-        glib::timeout_add_seconds_local(1, tick);
+        let mut rx = receiver.clone();
+        glib::spawn_future_local(clone!(@strong label => async move {
+            while rx.changed().await.is_ok() {
+                match *rx.borrow_and_update() {
+                    ChannelMessage::Init => {},
+                    ChannelMessage::Updated => {
+                        label.set_label(&Clock::formatted_time());
+                    },
+                }
+            }
+        }));
 
         Self {
             gtk_widget: label,
-            data: &DATETIME,
+            receiver,
         }
     }
 

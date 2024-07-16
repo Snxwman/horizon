@@ -10,3 +10,20 @@ pub use crate::state::{
     wm::HorizonWm,
 };
 
+pub trait HorizonState {
+    
+}
+
+#[derive(Debug)]
+pub enum ChannelMessage {
+    Init,
+    Updated,
+}
+
+#[derive(Debug)]
+pub enum Provider {
+    Function,
+    JsonFile(String),
+    External(String),
+    Dbus(String),
+}

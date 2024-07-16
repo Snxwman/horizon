@@ -2,61 +2,18 @@
 
 use std::rc::Rc;
 
+use gtk::prelude::*;
 use gtk::{Application, Window};
 
 use crate::prelude::*;
-use crate::x::ewmh::StrutPartialDef;
+use crate::x::ewmh::{WindowAnchor, WindowStackPosition, WindowType};
+use crate::x::strut::{StrutPartialDef, StrutPartialDefBuilder};
 use crate::x::x::XSessionContext;
 
 /// [Convenience for user config] default display number is usually 0.
 const MONITOR: usize = 0;
 /// [Convenience for user config] default is meaningless.
 const HEIGHT: i32 = 30;
-
-/// Possible types for `_NET_WM_WINDOW_TYPE`.
-#[derive(Debug)]
-pub enum WindowType {
-    Desktop,
-    Dialog,
-    Dock,
-    Menu,
-    Notification,  // NOTE: Does not appear in the ewmh spec
-    Normal,
-    Splash,
-    Toolbar,
-    Utility,
-}
-
-#[derive(Debug)]
-pub enum WindowAnchor {
-    TopLeft,
-    TopCenter,
-    TopRight,
-    CenterLeft,
-    CenterCenter,
-    CenterRight,
-    BottomLeft,
-    BottomCenter,
-    BottomRight,
-}
-
-#[derive(Debug)]
-pub enum WindowStackPosition {
-    Foreground,
-    Background,
-}
-
-#[derive(Debug)]
-pub struct Size {
-    pub width: i32,
-    pub height: i32,
-}
-
-#[derive(Debug)]
-pub struct Position {
-    pub x: i32,
-    pub y: i32,
-}
 
 /// User defined window configuration.
 #[derive(Debug)]
@@ -94,15 +51,18 @@ pub fn get_windows(horizon: &Application, x_session: Rc<XSessionContext>) -> Vec
     let strut = StrutPartialDef::builder()
         .xsession(x_session.clone())
         .monitor(MONITOR)
-        .size(HEIGHT as u32 + 5)
-        .top()
-        .full_length(Side::Top)
+        .size(HEIGHT + 5)
+        .top(Number::Absolute(HEIGHT))
+        .partial_length(30, 80)
+        // .full_length(Side::Top)
         .build();
+
+    dbg!("{}", &strut);
 
     let config = HorizonWindowConfig {
         screen: MONITOR,
         size: Size {width: x_session.get_monitor_width(MONITOR), height: HEIGHT},
-        position: Position {x: 0, y: 45},
+        position: Position {x: 0, y: 0},
         anchor: WindowAnchor::TopLeft,
         wm_ignore: true,
         stack_position: WindowStackPosition::Background,
@@ -110,7 +70,14 @@ pub fn get_windows(horizon: &Application, x_session: Rc<XSessionContext>) -> Vec
         strut: Some(strut),
     };
 
+    let _box = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .build();
+
     let clock = Clock::new();
+    let clock2 = Clock::new();
+    _box.append(&clock.widget());
+    _box.append(&clock2.widget());
 
     let gtk_window = Window::builder()
         .application(horizon)
@@ -119,7 +86,7 @@ pub fn get_windows(horizon: &Application, x_session: Rc<XSessionContext>) -> Vec
         .resizable(false)
         .focusable(true)
         .focus_on_click(true)
-        .child(&clock.widget())
+        .child(&_box)
         .build();
 
     vec![
