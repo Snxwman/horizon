@@ -1,4 +1,6 @@
-use x11rb::atom_manager;
+use x11rb::{atom_manager, protocol::xproto::Atom};
+
+use super::strut::StrutPartialDef;
 
 atom_manager! {
     pub AtomCollection: AtomCollectionCookie {
@@ -65,3 +67,36 @@ pub enum WindowStackPosition {
     Background,
 }
 
+pub struct EwmhHints {
+    pub anchor: Atom,
+    pub stack_positiona: Atom,
+    pub strut: Option<StrutPartialDef>,
+    pub window_type: Atom,
+    pub wm_ignore: bool,
+}
+
+impl EwmhHints {
+    pub fn new(atoms: &AtomCollection, window_type: &WindowType, strut: &Option<StrutPartialDef>) -> Self {
+        let window_type = match window_type {
+            WindowType::Desktop => atoms._NET_WM_WINDOW_TYPE_DESKTOP,
+            WindowType::Dock => atoms._NET_WM_WINDOW_TYPE_DOCK,
+            WindowType::Dialog => atoms._NET_WM_WINDOW_TYPE_DIALOG,
+            WindowType::Menu => atoms._NET_WM_WINDOW_TYPE_MENU,
+            WindowType::Normal => atoms._NET_WM_WINDOW_TYPE_NORMAL,
+            WindowType::Notification => atoms._NET_WM_WINDOW_TYPE_NOTIFICATION,
+            WindowType::Splash => atoms._NET_WM_WINDOW_TYPE_SPLASH,
+            WindowType::Toolbar => atoms._NET_WM_WINDOW_TYPE_TOOLBAR,
+            WindowType::Utility => atoms._NET_WM_WINDOW_TYPE_UTILITY,
+        };
+
+        let strut = strut.clone();
+
+        Self {
+            anchor: 0,
+            stack_positiona: 0,
+            strut,
+            window_type,
+            wm_ignore: true,
+        }
+    }
+}

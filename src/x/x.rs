@@ -10,8 +10,8 @@ use x11rb::protocol::xproto::{Atom, AtomEnum, ConfigureWindowAux, ConnectionExt,
 use x11rb::rust_connection::RustConnection;
 
 use crate::horizon::{HorizonWindow, HorizonWindowConfig};
-use crate::x::ewmh::{AtomCollection, WindowType};
-use crate::x::strut::StrutPartialDef;
+use crate::x::ewmh::{AtomCollection, WindowType, EwmhHints};
+use crate::x::strut::StrutPartialDef; 
 
 #[derive(Debug)]
 pub struct XSessionContext {
@@ -76,8 +76,7 @@ pub struct XWindowContext {
     surface: X11Surface,
     xid: Atom,
     atoms: AtomCollection,
-    window_type: u32,
-    strut: Option<StrutPartialDef>,
+    ewmh: EwmhHints,
 }
 
 impl XWindowContext {
@@ -89,31 +88,16 @@ impl XWindowContext {
 
         let xid = surface.xid() as Atom;
 
-        let strut = horizon_window.config.strut.clone();
-            // .as_ref()
-            // .map(|strut| strut.with_offset());
-
         let atoms = AtomCollection::new(&x_session.connection).unwrap()
             .reply().unwrap();
 
-        let window_type = match horizon_window.config.window_type {
-            WindowType::Desktop => atoms._NET_WM_WINDOW_TYPE_DESKTOP,
-            WindowType::Dock => atoms._NET_WM_WINDOW_TYPE_DOCK,
-            WindowType::Dialog => atoms._NET_WM_WINDOW_TYPE_DIALOG,
-            WindowType::Menu => atoms._NET_WM_WINDOW_TYPE_MENU,
-            WindowType::Normal => atoms._NET_WM_WINDOW_TYPE_NORMAL,
-            WindowType::Notification => atoms._NET_WM_WINDOW_TYPE_NOTIFICATION,
-            WindowType::Splash => atoms._NET_WM_WINDOW_TYPE_SPLASH,
-            WindowType::Toolbar => atoms._NET_WM_WINDOW_TYPE_TOOLBAR,
-            WindowType::Utility => atoms._NET_WM_WINDOW_TYPE_UTILITY,
-        };
+        let ewmh = EwmhHints::new(&atoms, &horizon_window.config.window_type, &horizon_window.config.strut);
 
         Self {
             surface,
             xid,
             atoms,
-            strut,
-            window_type
+            ewmh,
         }
     }
 
@@ -148,7 +132,7 @@ impl XWindowContext {
     }
 
     fn set_strut_partial_hint(&self, x_session: Rc<XSessionContext>) {
-        if self.strut.is_none() {
+        if self.ewmh.strut.is_none() {
             return;
         }
 
@@ -157,10 +141,7 @@ impl XWindowContext {
             .reply()
             .expect("Failed to get _NET_WM_STRUT_PARTIAL atom");
 
-        let offset_strut = self.strut
-            .as_ref()
-            .unwrap()
-            .as_x11_ready_value();
+        let strut = self.ewmh.strut.as_ref().unwrap().as_x11_ready_value();
 
         x_session.connection.change_property(
             PropMode::REPLACE,
@@ -169,7 +150,7 @@ impl XWindowContext {
             AtomEnum::CARDINAL,
             32,
             12,
-            &offset_strut
+            &strut
         ).expect("Failed to set _NET_WM_STRUT_PARTIAL property").check().unwrap();
 
         x_session.connection.flush().expect("Failed to flush connection");
@@ -202,7 +183,7 @@ impl XWindowContext {
             AtomEnum::ATOM,
             32,
             1,
-            &self.window_type.to_le_bytes(),
+            &self.ewmh.window_type.to_le_bytes(),
         ).expect("Failed to set _NET_WM_WINDOW_TYPE property").check().unwrap();
 
         x_session.connection.flush().expect("Failed to flush connection");

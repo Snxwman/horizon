@@ -48,8 +48,6 @@ async fn tokio_main() {
             interval.tick().await;
             DATETIME.write().unwrap().update();
             let _ = DATETIME.write().unwrap().sender.send(ChannelMessage::Updated);
-            // EVENT_MANAGER.notify_listeners(Event::HorizonDateTimeUpdated);
-            // print!("{:#?}", DATETIME.read().unwrap());
         }
     })
     .await;

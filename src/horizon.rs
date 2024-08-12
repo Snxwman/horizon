@@ -48,16 +48,18 @@ pub struct HorizonWindow {
 }
 
 pub fn get_windows(horizon: &Application, x_session: Rc<XSessionContext>) -> Vec<HorizonWindow> {
-    let strut = StrutPartialDef::builder()
-        .xsession(x_session.clone())
-        .monitor(MONITOR)
-        .size(HEIGHT + 5)
-        .top(Number::Absolute(HEIGHT))
-        .partial_length(30, 80)
-        // .full_length(Side::Top)
-        .build();
+    // let strut = StrutPartialDef::builder()
+    //     .xsession(x_session.clone())
+    //     .monitor(MONITOR)
+    //     .size(HEIGHT + 5)
+    //     .top(Number::Absolute(HEIGHT))
+    //     .partial_length(30, 80)
+    //     // .full_length(Side::Top)
+    //     .build();
 
-    dbg!("{}", &strut);
+    // dbg!("{}", &strut);
+
+    let strut = StrutPartialDef::default();
 
     let config = HorizonWindowConfig {
         screen: MONITOR,

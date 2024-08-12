@@ -10,3 +10,6 @@ pub use crate::widgets::{
     workspaces::Workspaces,
 };
 
+pub trait HorizonWidget {
+    fn update();
+}
